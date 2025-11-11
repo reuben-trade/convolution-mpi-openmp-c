@@ -45,8 +45,14 @@ void conv2d(
     int prow = coords[0], pcol = coords[1];
 
     // ---------- 2. Compute output block per rank ----------
-    int base_rows = W / prows; int rem_rows = W % prows;
-    int my_out_rows = base_rows + (prow<rem_rows?1:0);
+    int padH = kH - 1, padW = kW - 1;
+    int out_H = (W + padH - kH) / sH + 1;
+    int out_W = (H + padW - kW) / sW + 1;
+
+    // Partition Output space
+    int base_rows = out_H / prows; 
+    int base_cols = out_W / pcols;    int my_out_rows = base_rows + (prow<rem_rows?1:0);
+
     int row_offset = (prow<rem_rows)?prow*(base_rows+1):(rem_rows*(base_rows+1)+(prow-rem_rows)*base_rows);
 
     int base_cols = H / pcols; int rem_cols = H % pcols;
@@ -220,7 +226,7 @@ void conv2d(
 
     // ---------- 7. Gather outputs to rank 0 ----------
     if(rank==0){
-        float *full_output = malloc((size_t)W*H*sizeof(float));
+        float *full_output = malloc((size_t)out_H*out_W*sizeof(float));
         for(int rr=0;rr<my_out_rows;++rr)
             memcpy(full_output + (row_offset+rr)*H + col_offset, local_output + rr*my_out_cols, my_out_cols*sizeof(float));
         for(int rnk=1;rnk<num_procs;++rnk){
@@ -236,7 +242,7 @@ void conv2d(
                 memcpy(full_output + (r_row_offset+rr)*H + r_col_offset, tmp + rr*r_out_cols, r_out_cols*sizeof(float));
             free(tmp);
         }
-        if(outfile) write_matrix_to_file_text(outfile, full_output, W, H);
+        if(outfile) write_matrix_to_file_text(outfile, full_output, out_W, out_H);
         free(full_output);
     }else{
         MPI_Send(local_output, my_out_rows*my_out_cols, MPI_FLOAT, 0, 5555, MPI_COMM_WORLD);
