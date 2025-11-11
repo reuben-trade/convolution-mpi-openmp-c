@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "conv2d.h": "c",
+        "stddef.h": "c",
+        "conv2d_halo.h": "c"
+    }
+}
